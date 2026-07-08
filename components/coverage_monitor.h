@@ -9,11 +9,11 @@
 #define _COMPONENTS_COVERAGE_MONITOR_H_
 
 #include <cci_configuration>
-#include <systemc>
-#include <uvm>
 #include <core_mapper.h>
 #include <item/instruction_item.h>
 #include <memory>
+#include <systemc>
+#include <uvm>
 
 namespace components {
 

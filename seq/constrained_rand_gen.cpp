@@ -96,8 +96,8 @@ void constrained_rand_gen::before_end_of_elaboration() {
 
     if(enable_disass) {
         vm->setDisassEnabled(true);
-//        LOGGER(disass)::set_reporting_level(logging::INFO);
-//        LOGGER(disass)::print_time() = false;
+        //        LOGGER(disass)::set_reporting_level(logging::INFO);
+        //        LOGGER(disass)::print_time() = false;
     }
 }
 

@@ -7,12 +7,12 @@
 
 #include "components/coverage_monitor.h"
 #include "components/coverage_monitor/instr.h"
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 #include <fc4sc.hpp>
 #include <scc/report.h>
-#include <types.h>
 #include <systemc>
+#include <types.h>
 #include <util/ities.h>
 #include <variant>
 #include <vector>

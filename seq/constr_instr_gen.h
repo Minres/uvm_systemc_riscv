@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <cassert>
+#include <core_config.h>
 #include <coverage.h>
 #include <crave2uvm/crave2uvm.h>
 #include <cstdint>
@@ -11,10 +12,9 @@
 #include <memory>
 #include <scc/mt19937_rng.h>
 #include <scc/report.h>
+#include <seq/regs_accessor.h>
 #include <unordered_map>
 #include <unordered_set>
-#include <core_config.h>
-#include <seq/regs_accessor.h>
 
 namespace crig {
 using namespace crave;

@@ -36,7 +36,7 @@ public:
     iss::status read_mem(phys_addr_t addr, unsigned len, uint8_t* const data) override;
     iss::status write_mem(phys_addr_t addr, unsigned len, uint8_t const* const data) override { return iss::Ok; }
 
-    char const* instance_name() { return name();}
+    char const* instance_name() { return name(); }
 
 private:
     crig::ConstrInstrGen i_gen{"i_gen"};
