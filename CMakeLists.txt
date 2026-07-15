@@ -31,8 +31,10 @@ if(TARGET fmt::fmt-header-only)
 else()
     target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
 endif()
+if(TARGET crave2uvm::crave2uvm)
+	target_link_libraries(${PROJECT_NAME} PUBLIC crave2uvm::crave2uvm)
+endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC
-    crave2uvm::crave2uvm
     rv32iss
     accellera-uvm-systemc::accellera-uvm-systemc
     scc::scc
