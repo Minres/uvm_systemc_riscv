@@ -1,21 +1,26 @@
 project(uvm_systemc_riscv CXX)
 
+set(DISABLE_QKD_WARNING ON)
+
 find_package(fmt)
 find_package(accellera-uvm-systemc)
-find_package(crave2uvm REQUIRED)
+find_package(crave2uvm QUIET)
 
 add_library(${PROJECT_NAME}
     item/instruction_item.cpp
     components/coverage_monitor.cpp
     components/coverage_monitor/instr.cpp
+    seq/constr_instr_gen.cpp
 )
-if(WITH_CRAVE)
+if(TARGET crave2uvm::crave2uvm)
     target_sources(${PROJECT_NAME} PRIVATE
         seq/constrained_rand_gen.cpp
-        seq/constr_instr_gen.cpp
     )
     target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_CRAVE)
+else()
+	message(STATUS "Building without Crave")
 endif()
+
 if(EN_EXT_DEBUG)
     target_compile_definitions(${PROJECT_NAME} PRIVATE EN_EXT_DEBUG)
 endif()
