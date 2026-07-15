@@ -10,11 +10,11 @@ add_library(${PROJECT_NAME}
     item/instruction_item.cpp
     components/coverage_monitor.cpp
     components/coverage_monitor/instr.cpp
-    seq/constr_instr_gen.cpp
+	        seq/constrained_rand_gen.cpp
 )
 if(TARGET crave2uvm::crave2uvm)
     target_sources(${PROJECT_NAME} PRIVATE
-        seq/constrained_rand_gen.cpp
+	    seq/constr_instr_gen.cpp
     )
     target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_CRAVE)
 else()
@@ -31,10 +31,8 @@ if(TARGET fmt::fmt-header-only)
 else()
     target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
 endif()
-if(TARGET crave2uvm::crave2uvm)
-	target_link_libraries(${PROJECT_NAME} PUBLIC crave2uvm::crave2uvm)
-endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC
+    crave2uvm::crave2uvm
     rv32iss
     accellera-uvm-systemc::accellera-uvm-systemc
     scc::scc
