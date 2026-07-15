@@ -1,7 +1,5 @@
 project(uvm_systemc_riscv CXX)
 
-set(DISABLE_QKD_WARNING ON)
-
 find_package(fmt)
 find_package(accellera-uvm-systemc)
 find_package(crave2uvm QUIET)
@@ -9,16 +7,15 @@ find_package(crave2uvm QUIET)
 add_library(${PROJECT_NAME}
     item/instruction_item.cpp
     components/coverage_monitor.cpp
-    components/coverage_monitor/instr.cpp
-	        seq/constrained_rand_gen.cpp
+	components/coverage_monitor/instr.cpp
 )
 if(TARGET crave2uvm::crave2uvm)
-    target_sources(${PROJECT_NAME} PRIVATE
+	target_sources(${PROJECT_NAME} PUBLIC
+	    seq/constrained_rand_gen.cpp
 	    seq/constr_instr_gen.cpp
-    )
-    target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_CRAVE)
-else()
-	message(STATUS "Building without Crave")
+	)
+	target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_CRAVE)
+	target_link_libraries(${PROJECT_NAME} PUBLIC crave2uvm::crave2uvm)
 endif()
 
 if(EN_EXT_DEBUG)
@@ -31,10 +28,7 @@ if(TARGET fmt::fmt-header-only)
 else()
     target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
 endif()
-if(TARGET crave2uvm::crave2uvm)
-	target_link_libraries(${PROJECT_NAME} PUBLIC crave2uvm::crave2uvm)
-endif()
- target_link_libraries(${PROJECT_NAME} PUBLIC
+target_link_libraries(${PROJECT_NAME} PUBLIC
     rv32iss
     accellera-uvm-systemc::accellera-uvm-systemc
     scc::scc

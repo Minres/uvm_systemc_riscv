@@ -1,17 +1,17 @@
 #pragma once
 
 #include <cci_configuration>
+#include <core_mapper.h>
 #include <cstdint>
-#include <limits>
-#include <scc/utilities.h>
-#include <tlm_core/tlm_1/tlm_req_rsp/tlm_1_interfaces/tlm_core_ifs.h>
-#include <uvm>
-
 #include <instr_gen.h>
 #include <iss_if.h>
+#include <limits>
+#include <scc/utilities.h>
 #include <seq/constr_instr_gen.h>
 #include <seq/types.h>
+#include <tlm_core/tlm_1/tlm_req_rsp/tlm_1_interfaces/tlm_core_ifs.h>
 #include <types.h>
+#include <uvm>
 
 namespace seq {
 class constrained_rand_gen : public uvm::uvm_component, public seq_if, public iss_if, public irq_push_if {
