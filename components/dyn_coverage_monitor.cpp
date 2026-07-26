@@ -39,6 +39,8 @@ struct instruction_pattern {
     unsigned length;
 };
 
+enum class field_type { IMM, SRC, DST, SRC_DST };
+
 struct bit_field_desc {
     std::string name;
     unsigned instr_msb = 0;
@@ -49,6 +51,7 @@ struct bit_field_desc {
     unsigned index = std::numeric_limits<unsigned>::max();
     unsigned total_size = 0;
     bool is_constant = false;
+    field_type type = field_type::IMM;
 };
 
 struct bit_field_size {
@@ -137,8 +140,18 @@ std::vector<bit_field_desc> parse_bitfields(const YAML::Node& nodes, unsigned in
         field.instr_msb = next_lsb - 1;
         field.instr_lsb = next_lsb - field.width;
         next_lsb -= field.width;
-        if(field.name.size())
+        if(!field.is_constant) {
+            if(field.name == "rsd")
+                field.type = field_type::SRC_DST;
+            else {
+                auto prefix = field.name.substr(0, 2);
+                if(prefix == "rs")
+                    field.type = field_type::SRC;
+                else if(prefix == "rd")
+                    field.type = field_type::DST;
+            }
             fields.push_back(std::move(field));
+        }
     }
 
     if(next_lsb != 0)
@@ -177,6 +190,8 @@ struct instr_cg : public covergroup {
     instr_cg(std::string inst_name, instruction_desc const& desc)
     : fc4sc::covergroup("instr_coverage", __FILE__, __LINE__, inst_name)
     , desc(desc) {
+        regs_rd.reserve(4);
+        regs_wr.reserve(4);
         initialize_cvps();
         option.per_instance = true;
     }
@@ -186,22 +201,46 @@ struct instr_cg : public covergroup {
             std::visit([](auto& value) { value = {}; }, d);
         if(desc.bitfield_sizes.size())
             for(auto bf : desc.bitfields) {
-                if(!bf.is_constant) {
-                    auto& d = data[bf.index];
-                    if(bf.total_size > 32) {
-                        std::get<uint64_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
-                    } else if(bf.total_size > 16) {
-                        std::get<uint32_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
-                    } else if(bf.total_size > 8) {
-                        std::get<uint16_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
-                    } else if(bf.total_size > 5) {
-                        std::get<uint8_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
-                    } else if(bf.total_size == 1) {
-                        std::get<bool>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
-                    } else {
-                        std::get<uint8_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
-                    }
+                auto& d = data[bf.index];
+                if(bf.total_size > 32) {
+                    std::get<uint64_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
+                } else if(bf.total_size > 16) {
+                    std::get<uint32_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
+                } else if(bf.total_size > 8) {
+                    std::get<uint16_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
+                } else if(bf.total_size > 5) {
+                    std::get<uint8_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
+                } else if(bf.total_size == 1) {
+                    std::get<bool>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
+                } else {
+                    std::get<uint8_t>(d) |= extract_bits(instr, bf.instr_lsb, bf.width) << bf.field_lsb;
                 }
+                switch(bf.type) {
+                case field_type::DST:
+                    regs_wr.push_back(bf.width == 3 ? (std::get<uint8_t>(d) + 8) : std::get<uint8_t>(d));
+                    break;
+                case field_type::SRC:
+                    regs_rd.push_back(bf.width == 3 ? (std::get<uint8_t>(d) + 8) : std::get<uint8_t>(d));
+                    break;
+                case field_type::SRC_DST:
+                    auto val = bf.width == 3 ? (std::get<uint8_t>(d) + 8) : std::get<uint8_t>(d);
+                    regs_rd.push_back(val);
+                    regs_wr.push_back(val);
+                    break;
+                }
+                hazard_s.raw = std::any_of(last_regs_wr.begin(), last_regs_wr.end(), [&regs_rd](int element) {
+                    return std::find(regs_rd.begin(), regs_rd.end(), element) != regs_rd.end();
+                });
+                hazard_s.waw = std::any_of(last_regs_wr.begin(), last_regs_wr.end(), [&regs_wr](int element) {
+                    return std::find(regs_wr.begin(), regs_wr.end(), element) != regs_wr.end();
+                });
+                hazard_s.war = std::any_of(last_regs_rd.begin(), last_regs_rd.end(), [&regs_wr](int element) {
+                    return std::find(regs_wr.begin(), regs_wr.end(), element) != regs_wr.end();
+                });
+                last_regs_rd = regs_rd;
+                last_regs_wr = regs_wr;
+                regs_rd.clear();
+                regs_wr.clear();
             }
         else { // create a dummy coverpoint if we do not have any variable bitfields
             std::get<uint64_t>(data[0])++;
@@ -226,6 +265,14 @@ struct instr_cg : public covergroup {
         return *c;
     }
 
+    coverpoint<bool>& create_hazard_cvp(std::string const& name, bool& d) {
+        hazard_cvp.emplace_back(coverpoint<bool>({}));
+        auto* c = &hazard_cvp.back();
+        auto x = covergroup::register_cvp<bool>(
+            c, std::string(name), [&d]() -> bool { return d; }, name + "_s", []() -> bool { return (true); }, name + "_c");
+        new(c) coverpoint<bool>(x);
+        return *c;
+    }
     //! create a coverpoint and the data of type T to be observed and add bins for various ranges and specific values
     template <typename T> void create_cvp_for(std::string const& name, bit_field_size& bf_sz) {
         constexpr T zero = 0;
@@ -235,13 +282,12 @@ struct instr_cg : public covergroup {
         auto u_middle = (one << (width - 1));
         auto s_upper = ((one << width - 1) - 1);
         auto s_lower = ((one << width - 1));
-        auto& c = create_cvp<T>(name);
-        c = {fc4sc::bin<T>("umin", zero),
-             fc4sc::bin<T>("umax", u_upper << bf_sz.lsb),
-             fc4sc::bin<T>("smin", s_lower << bf_sz.lsb),
-             fc4sc::bin<T>("sneg", fc4sc::interval<T>(s_lower + 1, u_upper - 1)),
-             fc4sc::bin<T>("spos", interval<T>(1ull, s_upper - 1)),
-             fc4sc::bin<T>("smax", s_upper << bf_sz.lsb)};
+        create_cvp<T>(name) = {fc4sc::bin<T>("umin", zero),
+                               fc4sc::bin<T>("umax", u_upper << bf_sz.lsb),
+                               fc4sc::bin<T>("smin", s_lower << bf_sz.lsb),
+                               fc4sc::bin<T>("sneg", fc4sc::interval<T>(s_lower + 1, u_upper - 1)),
+                               fc4sc::bin<T>("spos", interval<T>(1ull, s_upper - 1)),
+                               fc4sc::bin<T>("smax", s_upper << bf_sz.lsb)};
     }
 
     template <typename T> void create_imm_cross(std::string name, coverpoint<T>* imm, coverpoint<uint8_t>* rs1) {
@@ -250,7 +296,9 @@ struct instr_cg : public covergroup {
 
     //! create coverpoints with bins for all variable bitfields in the instruction
     void initialize_cvps() {
-        if(desc.bitfield_sizes.size())
+        if(desc.bitfield_sizes.size()) {
+            bool cr_w = false;
+            bool cr_r = false;
             for(auto b : desc.bitfield_sizes) {
                 auto& name = b.first;
                 auto& bf_sz = b.second;
@@ -263,12 +311,15 @@ struct instr_cg : public covergroup {
                 } else if(bf_sz.msb > 4) {
                     create_cvp_for<uint8_t>(name, bf_sz);
                 } else if(bf_sz.msb == 0) {
-                    auto& c = create_cvp<bool>(name);
-                    c = {bin<bool>("no", false), bin<bool>("yes", false)};
+                    create_cvp<bool>(name) = {bin<bool>("no", false), bin<bool>("yes", false)};
                 } else {
                     auto& c = create_cvp<uint8_t>(name);
                     auto count = 1u << (bf_sz.msb - bf_sz.lsb + 1);
                     c = {bin_array<uint8_t>(name, count, interval(0u, count - 1))};
+                    if(name == "rd" || name == "rsd") {
+                        cr_w = true;
+                    } else if(name.substr(0, 2) == "rs")
+                        cr_r = true;
                 }
                 auto data_idx = data.size() - 1;
                 for(auto& bf : desc.bitfields) {
@@ -278,9 +329,14 @@ struct instr_cg : public covergroup {
                     }
                 }
             }
-        else {
-            auto& c = create_cvp<uint64_t>("hit");
-            c = {fc4sc::bin<uint64_t>("hit", interval<uint64_t>(1ull, std::numeric_limits<uint64_t>::max()))};
+            if(cr_w) {
+                create_hazard_cvp("war", hazard_s.war) = {bin<bool>("no", false), bin<bool>("yes", true)};
+                create_hazard_cvp("waw", hazard_s.waw) = {bin<bool>("no", false), bin<bool>("yes", true)};
+            }
+            if(cr_r)
+                create_hazard_cvp("raw", hazard_s.raw) = {bin<bool>("no", false), bin<bool>("yes", true)};
+        } else {
+            create_cvp<uint64_t>("hit") = {fc4sc::bin<uint64_t>("hit", interval<uint64_t>(1ull, std::numeric_limits<uint64_t>::max()))};
         }
         coverpoint<uint8_t>* rd = nullptr;
         coverpoint<uint8_t>* rs1 = nullptr;
@@ -317,11 +373,19 @@ struct instr_cg : public covergroup {
                 cvp[imm_index]);
         }
     }
+
+    static inline std::vector<unsigned> last_regs_rd = {}, last_regs_wr = {};
+    std::vector<unsigned> regs_rd, regs_wr;
+
+    hazard_type hazard_s;
     // we use deque since reallocating the content kills the fc4sc stuff as it relies on pointers
     std::deque<data_type> data;
+
+    std::deque<coverpoint<bool>> hazard_cvp;
     std::deque<cvp_data_type> cvp;
     std::deque<cross<uint8_t, uint8_t>> reg_crosses;
     std::deque<imm_cross_data_type> imm_crosses;
+
     instruction_desc desc;
 };
 
@@ -334,7 +398,7 @@ struct illegal_coverage : public covergroup {
         covergroup::sample();
     }
 
-    COVERPOINT(uint64_t, inst, inst_s) { bin_array<uint64_t>("illegal_instr", 64, interval(u32_limits::min(), u32_limits::max())) };
+    COVERPOINT(uint64_t, inst, inst_s){bin_array<uint64_t>("illegal_instr", 64, interval(u32_limits::min(), u32_limits::max()))};
 };
 
 struct trap_coverage : public covergroup {
@@ -346,38 +410,22 @@ struct trap_coverage : public covergroup {
         covergroup::sample();
     }
 
-    COVERPOINT(int, trap_id, trap_id_s) {
-        fc4sc::bin<int>("Instruction address misaligned", 0),
-        fc4sc::bin<int>("Instruction access fault", 1),
-        fc4sc::bin<int>("Illegal instruction", 2),
-        fc4sc::bin<int>("Breakpoint", 3),
-        fc4sc::bin<int>("Load address misaligned", 4),
-        fc4sc::bin<int>("Load access fault", 5),
-        fc4sc::bin<int>("Store/AMO address misaligned", 6),
-        fc4sc::bin<int>("Store/AMO access fault", 7),
-        fc4sc::bin<int>("Environment call from U-mode", 8),
-        fc4sc::bin<int>("Environment call from S-mode", 9),
-        fc4sc::illegal_bin<int>("Reserved", 10),
-        fc4sc::bin<int>("Environment call from M-mode", 11),
-        fc4sc::bin<int>("Instruction page fault", 12),
-        fc4sc::bin<int>("Load page fault", 13),
-        fc4sc::illegal_bin<int>("Reserved", 14),
-        fc4sc::bin<int>("Store/AMO page fault", 15)
-    };
-};
-
-struct no_regular_type_coverage : public covergroup {
-    CG_CONS(no_regular_type_coverage) {}
-
-    int32_t hit_s{0};
-    void sample() {
-        this->hit_s++;
-        covergroup::sample();
-    }
-
-    COVERPOINT(int32_t, hit, hit_s) {
-        fc4sc::bin<int32_t>("hit", 1),
-    };
+    COVERPOINT(int, trap_id, trap_id_s){fc4sc::bin<int>("Instruction address misaligned", 0),
+                                        fc4sc::bin<int>("Instruction access fault", 1),
+                                        fc4sc::bin<int>("Illegal instruction", 2),
+                                        fc4sc::bin<int>("Breakpoint", 3),
+                                        fc4sc::bin<int>("Load address misaligned", 4),
+                                        fc4sc::bin<int>("Load access fault", 5),
+                                        fc4sc::bin<int>("Store/AMO address misaligned", 6),
+                                        fc4sc::bin<int>("Store/AMO access fault", 7),
+                                        fc4sc::bin<int>("Environment call from U-mode", 8),
+                                        fc4sc::bin<int>("Environment call from S-mode", 9),
+                                        fc4sc::illegal_bin<int>("Reserved", 10),
+                                        fc4sc::bin<int>("Environment call from M-mode", 11),
+                                        fc4sc::bin<int>("Instruction page fault", 12),
+                                        fc4sc::bin<int>("Load page fault", 13),
+                                        fc4sc::illegal_bin<int>("Reserved", 14),
+                                        fc4sc::bin<int>("Store/AMO page fault", 15)};
 };
 
 struct dbus_access_coverage : public covergroup {
@@ -395,17 +443,13 @@ struct dbus_access_coverage : public covergroup {
         covergroup::sample();
     }
 
-    COVERPOINT(uint64_t, addr, addr_s) { bin_array<uint64_t>("segments", 16, interval(u32_limits::min(), u32_limits::max())) };
-    COVERPOINT(int32_t, size, size_s) {
-        fc4sc::bin<int>("1B", 1),
-        fc4sc::bin<int>("2B", 2),
-        fc4sc::bin<int>("4B", 4),
-        fc4sc::bin<int>("8B", 8)
-    };
-    COVERPOINT(int, rw, rw_s) { fc4sc::bin<int>("wr", 1), fc4sc::bin<int>("rd", 0) };
-    COVERPOINT(bool, raw, hazard_s.raw) { bin<bool>("no", false), bin<bool>("yes", true) };
-    COVERPOINT(bool, waw, hazard_s.waw) { bin<bool>("no", false), bin<bool>("yes", true) };
-    COVERPOINT(bool, war, hazard_s.war) { bin<bool>("no", false), bin<bool>("yes", true) };
+    COVERPOINT(uint64_t, addr, addr_s){bin_array<uint64_t>("segments", 16, interval(u32_limits::min(), u32_limits::max()))};
+    COVERPOINT(int32_t, size, size_s){fc4sc::bin<int>("1B", 1), fc4sc::bin<int>("2B", 2), fc4sc::bin<int>("4B", 4),
+                                      fc4sc::bin<int>("8B", 8)};
+    COVERPOINT(int, rw, rw_s){fc4sc::bin<int>("wr", 1), fc4sc::bin<int>("rd", 0)};
+    COVERPOINT(bool, raw, hazard_s.raw){bin<bool>("no", false), bin<bool>("yes", true)};
+    COVERPOINT(bool, waw, hazard_s.waw){bin<bool>("no", false), bin<bool>("yes", true)};
+    COVERPOINT(bool, war, hazard_s.war){bin<bool>("no", false), bin<bool>("yes", true)};
 
     cross<int32_t, int32_t> access_types_cross = cross<int32_t, int32_t>(this, "access_types", &size, &rw);
     cross<int32_t, int32_t, uint64_t> access_cross = cross<int32_t, int32_t, uint64_t>(this, "accesses", &size, &rw, &addr);
@@ -479,7 +523,7 @@ struct dyn_coverage_monitor::impl {
     bool last_dbus_access_was_wr = false;
     int last_rd;
     std::array<std::vector<instruction_pattern>, 4> qlut;
-    //std::vector<instruction_desc> instr_desc;
+    // std::vector<instruction_desc> instr_desc;
     std::deque<instr_cg> cgs;
     illegal_coverage ill_cg;
     dbus_access_coverage dbus_cg;
