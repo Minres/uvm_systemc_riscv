@@ -228,13 +228,13 @@ struct instr_cg : public covergroup {
                     regs_wr.push_back(val);
                     break;
                 }
-                hazard_s.raw = std::any_of(last_regs_wr.begin(), last_regs_wr.end(), [&regs_rd](int element) {
+                hazard_s.raw = std::any_of(last_regs_wr.begin(), last_regs_wr.end(), [this](unsigned element) {
                     return std::find(regs_rd.begin(), regs_rd.end(), element) != regs_rd.end();
                 });
-                hazard_s.waw = std::any_of(last_regs_wr.begin(), last_regs_wr.end(), [&regs_wr](int element) {
+                hazard_s.waw = std::any_of(last_regs_wr.begin(), last_regs_wr.end(), [this](unsigned element) {
                     return std::find(regs_wr.begin(), regs_wr.end(), element) != regs_wr.end();
                 });
-                hazard_s.war = std::any_of(last_regs_rd.begin(), last_regs_rd.end(), [&regs_wr](int element) {
+                hazard_s.war = std::any_of(last_regs_rd.begin(), last_regs_rd.end(), [this](unsigned element) {
                     return std::find(regs_wr.begin(), regs_wr.end(), element) != regs_wr.end();
                 });
                 last_regs_rd = regs_rd;
