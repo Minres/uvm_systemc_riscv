@@ -382,7 +382,7 @@ struct instr_cg : public covergroup {
     static inline std::vector<unsigned> last_regs_rd = {}, last_regs_wr = {};
     std::vector<unsigned> regs_rd, regs_wr;
 
-    bool branch_taken=false;
+    bool branch_taken = false;
     hazard_type hazard_s;
     // we use deque since reallocating the content kills the fc4sc stuff as it relies on pointers
     std::deque<data_type> data;
