@@ -196,9 +196,11 @@ struct instr_cg : public covergroup {
         option.per_instance = true;
     }
 
-    void sample(unsigned last_written_reg, uint32_t instr) {
+    void sample(unsigned last_written_reg, uint32_t instr, bool branch_taken) {
+        // clean the queue holding the data accesses
         for(auto& d : data)
             std::visit([](auto& value) { value = {}; }, d);
+        // extract the instruction information and store in variables being sampled
         if(desc.bitfield_sizes.size())
             for(auto bf : desc.bitfields) {
                 auto& d = data[bf.index];
@@ -245,6 +247,7 @@ struct instr_cg : public covergroup {
         else { // create a dummy coverpoint if we do not have any variable bitfields
             std::get<uint64_t>(data[0])++;
         }
+        this->branch_taken = branch_taken;
         covergroup::sample();
     }
 
@@ -338,6 +341,8 @@ struct instr_cg : public covergroup {
         } else {
             create_cvp<uint64_t>("hit") = {fc4sc::bin<uint64_t>("hit", interval<uint64_t>(1ull, std::numeric_limits<uint64_t>::max()))};
         }
+        if(desc.branch)
+            create_cvp<bool>("branch taken") = {bin<bool>("no", false), bin<bool>("yes", false)};
         coverpoint<uint8_t>* rd = nullptr;
         coverpoint<uint8_t>* rs1 = nullptr;
         coverpoint<uint8_t>* rs2 = nullptr;
@@ -377,6 +382,7 @@ struct instr_cg : public covergroup {
     static inline std::vector<unsigned> last_regs_rd = {}, last_regs_wr = {};
     std::vector<unsigned> regs_rd, regs_wr;
 
+    bool branch_taken=false;
     hazard_type hazard_s;
     // we use deque since reallocating the content kills the fc4sc stuff as it relies on pointers
     std::deque<data_type> data;
@@ -515,7 +521,7 @@ struct dyn_coverage_monitor::impl {
             ill_cg.sample(exc.fetch_value);
             return;
         }
-        cgs[inst_id].sample(last_written_reg, exc.fetch_value);
+        cgs[inst_id].sample(last_written_reg, exc.fetch_value, exc.br_taken);
     }
 
     unsigned last_written_reg = -1;
