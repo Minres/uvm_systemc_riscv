@@ -256,7 +256,7 @@ struct illegal_coverage : public covergroup {
         covergroup::sample();
     }
 
-    COVERPOINT(uint64_t, inst, inst_s){bin_array<uint64_t>("illegal_instr", 64, interval(u32_limits::min(), u32_limits::max()))};
+    COVERPOINT(uint64_t, inst, inst_s) { bin_array<uint64_t>("illegal_instr", 64, interval(u32_limits::min(), u32_limits::max())) };
 };
 
 struct trap_coverage : public covergroup {
@@ -268,22 +268,24 @@ struct trap_coverage : public covergroup {
         covergroup::sample();
     }
 
-    COVERPOINT(int, trap_id, trap_id_s){fc4sc::bin<int>("Instruction address misaligned", 0),
-                                        fc4sc::bin<int>("Instruction access fault", 1),
-                                        fc4sc::bin<int>("Illegal instruction", 2),
-                                        fc4sc::bin<int>("Breakpoint", 3),
-                                        fc4sc::bin<int>("Load address misaligned", 4),
-                                        fc4sc::bin<int>("Load access fault", 5),
-                                        fc4sc::bin<int>("Store/AMO address misaligned", 6),
-                                        fc4sc::bin<int>("Store/AMO access fault", 7),
-                                        fc4sc::bin<int>("Environment call from U-mode", 8),
-                                        fc4sc::bin<int>("Environment call from S-mode", 9),
-                                        fc4sc::illegal_bin<int>("Reserved", 10),
-                                        fc4sc::bin<int>("Environment call from M-mode", 11),
-                                        fc4sc::bin<int>("Instruction page fault", 12),
-                                        fc4sc::bin<int>("Load page fault", 13),
-                                        fc4sc::illegal_bin<int>("Reserved", 14),
-                                        fc4sc::bin<int>("Store/AMO page fault", 15)};
+    COVERPOINT(int, trap_id, trap_id_s) {
+        fc4sc::bin<int>("Instruction address misaligned", 0),
+        fc4sc::bin<int>("Instruction access fault", 1),
+        fc4sc::bin<int>("Illegal instruction", 2),
+        fc4sc::bin<int>("Breakpoint", 3),
+        fc4sc::bin<int>("Load address misaligned", 4),
+        fc4sc::bin<int>("Load access fault", 5),
+        fc4sc::bin<int>("Store/AMO address misaligned", 6),
+        fc4sc::bin<int>("Store/AMO access fault", 7),
+        fc4sc::bin<int>("Environment call from U-mode", 8),
+        fc4sc::bin<int>("Environment call from S-mode", 9),
+        fc4sc::illegal_bin<int>("Reserved", 10),
+        fc4sc::bin<int>("Environment call from M-mode", 11),
+        fc4sc::bin<int>("Instruction page fault", 12),
+        fc4sc::bin<int>("Load page fault", 13),
+        fc4sc::illegal_bin<int>("Reserved", 14),
+        fc4sc::bin<int>("Store/AMO page fault", 15)
+    };
 };
 
 struct dbus_access_coverage : public covergroup {
@@ -301,13 +303,17 @@ struct dbus_access_coverage : public covergroup {
         covergroup::sample();
     }
 
-    COVERPOINT(uint64_t, addr, addr_s){bin_array<uint64_t>("segments", 16, interval(u32_limits::min(), u32_limits::max()))};
-    COVERPOINT(int32_t, size, size_s){fc4sc::bin<int>("1B", 1), fc4sc::bin<int>("2B", 2), fc4sc::bin<int>("4B", 4),
-                                      fc4sc::bin<int>("8B", 8)};
-    COVERPOINT(int, rw, rw_s){fc4sc::bin<int>("wr", 1), fc4sc::bin<int>("rd", 0)};
-    COVERPOINT(bool, raw, hazard_s.raw){bin<bool>("no", false), bin<bool>("yes", true)};
-    COVERPOINT(bool, waw, hazard_s.waw){bin<bool>("no", false), bin<bool>("yes", true)};
-    COVERPOINT(bool, war, hazard_s.war){bin<bool>("no", false), bin<bool>("yes", true)};
+    COVERPOINT(uint64_t, addr, addr_s) { bin_array<uint64_t>("segments", 16, interval(u32_limits::min(), u32_limits::max())) };
+    COVERPOINT(int32_t, size, size_s) {
+        fc4sc::bin<int>("1B", 1),
+        fc4sc::bin<int>("2B", 2),
+        fc4sc::bin<int>("4B", 4),
+        fc4sc::bin<int>("8B", 8)
+    };
+    COVERPOINT(int, rw, rw_s) { fc4sc::bin<int>("wr", 1), fc4sc::bin<int>("rd", 0) };
+    COVERPOINT(bool, raw, hazard_s.raw) { bin<bool>("no", false), bin<bool>("yes", true) };
+    COVERPOINT(bool, waw, hazard_s.waw) { bin<bool>("no", false), bin<bool>("yes", true) };
+    COVERPOINT(bool, war, hazard_s.war) { bin<bool>("no", false), bin<bool>("yes", true) };
 
     cross<int32_t, int32_t> access_types_cross = cross<int32_t, int32_t>(this, "access_types", &size, &rw);
     cross<int32_t, int32_t, uint64_t> access_cross = cross<int32_t, int32_t, uint64_t>(this, "accesses", &size, &rw, &addr);
@@ -366,7 +372,7 @@ dyn_coverage_monitor::~dyn_coverage_monitor() {
 void dyn_coverage_monitor::build_phase(uvm::uvm_phase& phase) {
     uvm::uvm_config_db<std::string>::get(this, "", "isa_yaml_file_name", isa_yaml_file_name);
     uvm::uvm_config_db<std::string>::get(this, "", "report_file_name", report_file_name);
-    if(isa_yaml_file_name.size()) {
+    if(report_file_name.size()) {
         pimpl->parse_YAML_ISA(isa_yaml_file_name);
         pimpl->trap_cg.option.merge_instances = true;
         pimpl->dbus_cg.option.merge_instances = true;
