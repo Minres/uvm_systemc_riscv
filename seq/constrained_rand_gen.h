@@ -39,7 +39,7 @@ public:
     char const* instance_name() { return name(); }
 
 private:
-    crig::ConstrInstrGen i_gen{"i_gen"};
+    constr_instr_gen i_gen{"i_gen"};
     std::vector<uint8_t> instr_buffer;
     std::vector<uint8_t> data_buffer;
 

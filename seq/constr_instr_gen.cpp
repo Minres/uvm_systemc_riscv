@@ -1,19 +1,20 @@
+#include "constr_instr_gen.h"
+#include "regs_accessor.h"
 #include <algorithm>
 #include <csr.h>
 #include <functional>
 #include <instr.h>
 #include <instr_encoding.h>
 #include <scc/report.h>
-#include <src/uvm_systemc_riscv/seq/constr_instr_gen.h>
 #include <stdint.h>
 #include <unordered_set>
 #include <vector>
 
-namespace crig {
+namespace seq {
 
 #define RO_CSR_MASK 0xC00
 
-ConstrInstrGen::ConstrInstrGen(std::string name)
+constr_instr_gen::constr_instr_gen(std::string name)
 : all_instructions({{254, {"RANDOM", 0b00000000000000000000000000000000, 0b00000000000000000000000000000000}},
                     {255, {"ILLEGAL", 0b11111111111111111111111111111111, 0b00000000000000000000000000000000}}})
 , unsupported_csrs({// skip mstatus so that MIE is never set
@@ -22,14 +23,14 @@ ConstrInstrGen::ConstrInstrGen(std::string name)
     read_isa_config(aging::manager().get_group_map());
 }
 
-void ConstrInstrGen::add_csr_to_ignore(unsigned addr) { unsupported_csrs.insert(addr); }
+void constr_instr_gen::add_csr_to_ignore(unsigned addr) { unsupported_csrs.insert(addr); }
 
-void ConstrInstrGen::read_isa_config(std::unordered_map<std::string, std::vector<aging::instruction>> const& isa_config) {
+void constr_instr_gen::read_isa_config(std::unordered_map<std::string, std::vector<aging::instruction>> const& isa_config) {
     uint32_t lowest_instr_idx{std::numeric_limits<uint32_t>::max()};
     uint32_t highest_instr_idx{0};
     for(auto& subset : isa_config) {
         for(auto& instruction : subset.second) {
-            InstrInfo info = InstrInfo();
+            instr_info info = instr_info();
             info.name = instruction.name.c_str();
             info.encoding = instruction.encoding;
             info.mask = instruction.mask;
@@ -44,10 +45,10 @@ void ConstrInstrGen::read_isa_config(std::unordered_map<std::string, std::vector
             }
         }
     }
-    instr_constr = new InstrConstr(lowest_instr_idx, highest_instr_idx, num_regs);
+    iconstr = new instr_constr(lowest_instr_idx, highest_instr_idx, num_regs);
 }
 
-bool ConstrInstrGen::is_unsupported(uint32_t x) {
+bool constr_instr_gen::is_unsupported(uint32_t x) {
     auto it = std::find_if(std::begin(skipped_instr), std::end(skipped_instr),
                            [x](std::pair<uint32_t, uint32_t> const& p) { return (x & p.first) == (p.second); });
     if(it != std::end(skipped_instr))
@@ -92,16 +93,16 @@ bool ConstrInstrGen::is_unsupported(uint32_t x) {
     return false;
 }
 
-uint32_t ConstrInstrGen::next(uint64_t addr) {
+uint32_t constr_instr_gen::next(uint64_t addr) {
     crave::randv<int32_t> imm;
     crave::Generator gen;
     auto adr_offset = regs_len / 8;
     uint64_t rs1_val{0};
 
     for(;;) {
-        CHECK(instr_constr->next());
+        CHECK(iconstr->next());
 
-        auto& s = all_instructions.at(instr_constr->instr_idx);
+        auto& s = all_instructions.at(iconstr->instr_idx);
         uint32_t r = scc::MT19937::uniform<uint32_t>();
         uint32_t x = (r & ~s.mask) | s.encoding;
 
@@ -111,14 +112,14 @@ uint32_t ConstrInstrGen::next(uint64_t addr) {
             gen(imm() % adr_offset == 0 && imm() != 0); // don't jumps to self to avoid endless loop
             gen.next();
             instr.set_J_imm(imm);
-            instr.set_rd(instr_constr->rd);
+            instr.set_rd(iconstr->rd);
             break;
         case JALR_ENCODING:
-            gen((imm() + regs_accessor->get_reg(instr_constr->rs1)) % adr_offset == 0);
+            gen((imm() + regs_accessor->get_reg(iconstr->rs1)) % adr_offset == 0);
             gen.next();
             instr.set_I_imm(imm);
-            instr.set_rd(instr_constr->rd);
-            instr.set_rs1(instr_constr->rs1);
+            instr.set_rd(iconstr->rd);
+            instr.set_rs1(iconstr->rs1);
             break;
         case BEQ_ENCODING:
         case BNE_ENCODING:
@@ -126,64 +127,64 @@ uint32_t ConstrInstrGen::next(uint64_t addr) {
         case BLTU_ENCODING:
         case BGE_ENCODING:
         case BGEU_ENCODING:
-            instr.set_B_imm(instr_constr->addr); // TODO:ensure leaving the cache
-            instr.set_rd(instr_constr->rd);
-            instr.set_rs1(instr_constr->rs1);
-            instr.set_rs2(instr_constr->rs2);
+            instr.set_B_imm(iconstr->addr); // TODO:ensure leaving the cache
+            instr.set_rd(iconstr->rd);
+            instr.set_rs1(iconstr->rs1);
+            instr.set_rs2(iconstr->rs2);
             break;
         case LW_ENCODING:
-            gen((imm() + regs_accessor->get_reg(instr_constr->rs1)) % adr_offset == 0);
+            gen((imm() + regs_accessor->get_reg(iconstr->rs1)) % adr_offset == 0);
             gen.next();
             instr.set_I_imm(imm);
-            instr.set_rd(instr_constr->rd);
-            instr.set_rs1(instr_constr->rs1);
+            instr.set_rd(iconstr->rd);
+            instr.set_rs1(iconstr->rs1);
             break;
         case LH_ENCODING:
         case LHU_ENCODING:
-            rs1_val = regs_accessor->get_reg(instr_constr->rs1);
+            rs1_val = regs_accessor->get_reg(iconstr->rs1);
             gen((imm() + rs1_val) % 2 == 0);
             gen.next();
-            SCCDEBUG("Instr Gen") << "Load imm: " << imm << " rs1 :" << instr_constr->rs1 << " base " << rs1_val;
+            SCCDEBUG("Instr Gen") << "Load imm: " << imm << " rs1 :" << iconstr->rs1 << " base " << rs1_val;
             instr.set_I_imm(imm);
-            instr.set_rd(instr_constr->rd);
-            instr.set_rs1(instr_constr->rs1);
+            instr.set_rd(iconstr->rd);
+            instr.set_rs1(iconstr->rs1);
             break;
         case LB_ENCODING:
         case LBU_ENCODING:
-            instr.set_I_imm(instr_constr->addr);
-            instr.set_rd(instr_constr->rd);
-            instr.set_rs1(instr_constr->rs1);
+            instr.set_I_imm(iconstr->addr);
+            instr.set_rd(iconstr->rd);
+            instr.set_rs1(iconstr->rs1);
             break;
         case SW_ENCODING:
             // Stores the value in register rs2 to memory
-            rs1_val = regs_accessor->get_reg(instr_constr->rs1);
+            rs1_val = regs_accessor->get_reg(iconstr->rs1);
             gen((imm() + rs1_val) % adr_offset == 0);
             gen.next();
-            SCCDEBUG("Instr Gen") << "Store imm: " << imm << " rs1 :" << instr_constr->rs1 << " base " << rs1_val;
+            SCCDEBUG("Instr Gen") << "Store imm: " << imm << " rs1 :" << iconstr->rs1 << " base " << rs1_val;
 
             instr.set_S_imm(imm);
-            instr.set_rs1(instr_constr->rs1);
-            instr.set_rs2(instr_constr->rs2);
+            instr.set_rs1(iconstr->rs1);
+            instr.set_rs2(iconstr->rs2);
             break;
         case SH_ENCODING:
-            gen((imm() + regs_accessor->get_reg(instr_constr->rs1)) % 2 == 0);
+            gen((imm() + regs_accessor->get_reg(iconstr->rs1)) % 2 == 0);
             gen.next();
             instr.set_S_imm(imm);
-            instr.set_rs1(instr_constr->rs1);
-            instr.set_rs2(instr_constr->rs2);
+            instr.set_rs1(iconstr->rs1);
+            instr.set_rs2(iconstr->rs2);
             break;
         case SB_ENCODING:
-            instr.set_S_imm(instr_constr->addr);
-            instr.set_rs1(instr_constr->rs1);
-            instr.set_rs2(instr_constr->rs2);
+            instr.set_S_imm(iconstr->addr);
+            instr.set_rs1(iconstr->rs1);
+            instr.set_rs2(iconstr->rs2);
             break;
         case C_LW_ENCODING:
         case C_SW_ENCODING:
-            if((regs_accessor->get_reg(instr_constr->c_rs1) + instr_constr->addr) % adr_offset != 0)
+            if((regs_accessor->get_reg(iconstr->c_rs1) + iconstr->addr) % adr_offset != 0)
                 continue; // skip if the RS1' value is not word aligned
-            instr.set_c_LW_imm(instr_constr->addr);
-            instr.set_c_rs2_small(instr_constr->c_rs2);
-            instr.set_c_rs1_small(instr_constr->c_rs1);
+            instr.set_c_LW_imm(iconstr->addr);
+            instr.set_c_rs2_small(iconstr->c_rs2);
+            instr.set_c_rs1_small(iconstr->c_rs1);
             break;
         case C_LWSP_ENCODING:
         case C_SWSP_ENCODING:
@@ -195,18 +196,18 @@ uint32_t ConstrInstrGen::next(uint64_t addr) {
         case CSRRS_ENCODING:
         case CSRRC_ENCODING:
             do {
-                CHECK(csr_constr.next());
-            } while((csr_constr.get_csr_addr() & RO_CSR_MASK) == RO_CSR_MASK);
-            instr.set_csr(csr_constr.get_csr_addr());
-            instr.set_rs1(instr_constr->rs1);
-            instr.set_rd(instr_constr->rd);
+                CHECK(csrconstr.next());
+            } while((csrconstr.get_csr_addr() & RO_CSR_MASK) == RO_CSR_MASK);
+            instr.set_csr(csrconstr.get_csr_addr());
+            instr.set_rs1(iconstr->rs1);
+            instr.set_rd(iconstr->rd);
             break;
         case CSRRSI_ENCODING:
         case CSRRCI_ENCODING:
-            CHECK(csr_constr.next());
-            instr.set_csr(csr_constr.get_csr_addr());
+            CHECK(csrconstr.next());
+            instr.set_csr(csrconstr.get_csr_addr());
             instr.set_rs1(0);
-            instr.set_rd(instr_constr->rd);
+            instr.set_rd(iconstr->rd);
             break;
         case C_ADDI4SPN_ENCODING:
             if(C_ADDI4SPN_NZUIMM(instr.data()) == 0)
@@ -226,22 +227,22 @@ uint32_t ConstrInstrGen::next(uint64_t addr) {
         }
 
         if(!is_unsupported(instr.data())) {
-            SCCDEBUG("Instr Gen") << "Next RND Instr: " << instr_constr->instr_idx << " name " << s.name;
-            instr_constr->update_addr_list(instr_constr->addr);
+            SCCDEBUG("Instr Gen") << "Next RND Instr: " << iconstr->instr_idx << " name " << s.name;
+            iconstr->update_addr_list(iconstr->addr);
             return instr.data();
         }
     };
     return 0;
 }
 
-void ConstrInstrGen::setup_regs(uint8_t* regs, uint32_t rfs, uint32_t len) {
+void constr_instr_gen::setup_regs(uint8_t* regs, uint32_t rfs, uint32_t len) {
     if(len == 64) {
-        regs_accessor = std::make_unique<RegsAccessor<uint64_t>>(regs);
+        regs_accessor = std::make_unique<regs_accessor_64>(regs);
     } else {
-        regs_accessor = std::make_unique<RegsAccessor<uint32_t>>(regs);
+        regs_accessor = std::make_unique<regs_accessor_32>(regs);
     }
     num_regs = rfs;
     regs_len = len;
 }
 
-} // namespace crig
+} // namespace seq
