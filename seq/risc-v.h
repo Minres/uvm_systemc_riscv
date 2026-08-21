@@ -1,0 +1,51 @@
+#pragma once
+#include <cstdint>
+
+namespace riscv {
+constexpr uint32_t CSRRW_MASK = 0b00000000000000000111000001111111;
+constexpr uint32_t CSRRW_ENCODING = 0b00000000000000000001000001110011;
+constexpr uint32_t CSRRS_MASK = 0b00000000000000000111000001111111;
+constexpr uint32_t CSRRS_ENCODING = 0b00000000000000000010000001110011;
+constexpr uint32_t CSRRC_MASK = 0b00000000000000000111000001111111;
+constexpr uint32_t CSRRC_ENCODING = 0b00000000000000000011000001110011;
+constexpr uint32_t CSRRWI_MASK = 0b00000000000000000111000001111111;
+constexpr uint32_t CSRRWI_ENCODING = 0b00000000000000000101000001110011;
+constexpr uint32_t CSRRSI_MASK = 0b00000000000000000111000001111111;
+constexpr uint32_t CSRRSI_ENCODING = 0b00000000000000000110000001110011;
+constexpr uint32_t CSRRCI_MASK = 0b00000000000000000111000001111111;
+constexpr uint32_t CSRRCI_ENCODING = 0b00000000000000000111000001110011;
+
+constexpr uint32_t URET_MASK = 0b11111111111111111111111111111111;
+constexpr uint32_t URET_ENCODING = 0b00000000001000000000000001110011;
+constexpr uint32_t SRET_MASK = 0b11111111111111111111111111111111;
+constexpr uint32_t SRET_ENCODING = 0b00010000001000000000000001110011;
+constexpr uint32_t MRET_MASK = 0b11111111111111111111111111111111;
+constexpr uint32_t MRET_ENCODING = 0b00110000001000000000000001110011;
+constexpr uint32_t WFI_MASK = 0b11111111111111111111111111111111;
+constexpr uint32_t WFI_ENCODING = 0b00010000010100000000000001110011;
+
+constexpr unsigned short USTATUS_ADDR = 0x000;
+constexpr unsigned short UIP_ADDR = 0x044;
+constexpr unsigned short MSTATUS_ADDR = 0x300;
+constexpr unsigned short MIP_ADDR = 0x344;
+constexpr unsigned short PMPCFG0_ADDR = 0x3A0;
+constexpr unsigned short PMPCFG1_ADDR = 0x3A1;
+constexpr unsigned short PMPCFG2_ADDR = 0x3A2;
+constexpr unsigned short PMPCFG3_ADDR = 0x3A3;
+constexpr unsigned DCSR_ADDR = 0x7B0;
+
+constexpr unsigned MCYCLE_ADDR = 0xB00;
+constexpr unsigned MCYCLEH_ADDR = 0xB80;
+constexpr unsigned MTIME_ADDR = 0xB01;
+constexpr unsigned MTIMEH_ADDR = 0xB81;
+constexpr unsigned MINSTRET_ADDR = 0xB02;
+constexpr unsigned MINSTRETH_ADDR = 0xB82;
+
+constexpr unsigned short CYCLE_ADDR = 0xC00;
+constexpr unsigned short CYCLEH_ADDR = 0xC80;
+constexpr unsigned short TIME_ADDR = 0xC01;
+constexpr unsigned short TIMEH_ADDR = 0xC81;
+constexpr unsigned short INSTRET_ADDR = 0xC02;
+constexpr unsigned short INSTRETH_ADDR = 0xC82;
+
+}

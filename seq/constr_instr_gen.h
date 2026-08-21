@@ -47,6 +47,8 @@ struct instr_constr : public rand_obj {
         }
     }
 
+    virtual ~instr_constr() = default;
+
     void update_addr_list(uint32_t new_addr) {
         address_store.pop_front();
         address_store.push_back(new_addr);
@@ -64,6 +66,8 @@ struct csr_constr : public rand_obj {
     , csr_idx(this) {
         constraint("csr", dist(csr_idx(), distribution<uint32_t>::simple_range(0, csr_registers.size() - 1)));
     }
+
+    virtual ~csr_constr() = default;
 };
 
 struct constr_instr_gen {

@@ -12,12 +12,13 @@ add_library(${PROJECT_NAME}
     components/yaml_instruction_parser.cpp
 )
 if(TARGET crave2uvm::crave2uvm)
-	target_sources(${PROJECT_NAME} PUBLIC
-	    seq/constrained_rand_gen.cpp
-	    seq/constr_instr_gen.cpp
-	)
-	target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_CRAVE)
-	target_link_libraries(${PROJECT_NAME} PUBLIC crave2uvm::crave2uvm)
+    target_sources(${PROJECT_NAME} PUBLIC
+        seq/constrained_rand_gen.cpp
+        seq/constr_instr_gen.cpp
+        seq/instr_gen.cpp
+    )
+    target_compile_definitions(${PROJECT_NAME} PUBLIC WITH_CRAVE)
+    target_link_libraries(${PROJECT_NAME} PUBLIC crave2uvm::crave2uvm)
 endif()
 
 if(EN_EXT_DEBUG)
