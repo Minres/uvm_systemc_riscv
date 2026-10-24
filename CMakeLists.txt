@@ -7,8 +7,9 @@ find_package(crave2uvm QUIET)
 add_library(${PROJECT_NAME}
     item/instruction_item.cpp
     components/coverage_monitor.cpp
-	components/coverage_monitor/instr.cpp
+    components/coverage_monitor/instr.cpp
     components/dyn_coverage_monitor.cpp
+    components/yaml_instruction_parser.cpp
 )
 if(TARGET crave2uvm::crave2uvm)
 	target_sources(${PROJECT_NAME} PUBLIC
