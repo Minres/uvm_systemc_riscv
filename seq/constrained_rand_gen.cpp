@@ -5,6 +5,7 @@
 #include <elfio/elfio.hpp>
 #include <fmt/format.h>
 #include <functional>
+#include <iss/arch_if.h>
 #include <iss/vm_plugin.h>
 #include <scc/mt19937_rng.h>
 #include <scc/report.h>
@@ -15,12 +16,11 @@
 
 using namespace sc_core;
 using namespace util;
-using namespace seq;
 
 constexpr uint32_t word_size = 4;
 constexpr uint32_t trap_handler_addr = 0xffff04c0;
 uint32_t process_line(std::string const& line, uint64_t line_no);
-
+namespace {
 inline unsigned copy_into(uint32_t instr, uint8_t* data) {
     assert(data);
     if constexpr(util::endian::little) {
@@ -46,8 +46,42 @@ inline uint32_t instr_from(size_t len, uint8_t* data) {
     }
     return res;
 }
+}
 
-mem_rsp seq::constrained_rand_gen::transport(const mem_req& tx) {
+namespace seq {
+
+
+struct iss_plugin : public iss::vm_plugin {
+
+    iss::instrumentation_if* cpu_instrumentation_if{nullptr};
+    uint64_t pending_traps{0};
+
+    virtual ~iss_plugin() {}
+
+    bool registration(const char* const version, iss::vm_if& vm) override {
+        cpu_instrumentation_if =  vm.get_arch()->get_instrumentation_if();
+        return true;
+    };
+
+    iss::sync_type get_sync() override {return iss::sync_type::POST_SYNC;};
+
+    void callback(iss::instr_info_t) override {
+        pending_traps = cpu_instrumentation_if->get_pending_traps();
+    };
+};
+
+constrained_rand_gen::constrained_rand_gen(uvm::uvm_component_name name)
+: uvm::uvm_component(name) {
+    mem_p(*this);
+    gen_startup_code();
+    gen_trap_handler_mc();
+    SC_HAS_PROCESS(constrained_rand_gen);
+    SC_THREAD(run);
+}
+
+constrained_rand_gen::~constrained_rand_gen() = default;
+
+mem_rsp constrained_rand_gen::transport(const mem_req& tx) {
     request_fifo.write(tx);
     auto resp = response_fifo.read();
     return resp;
@@ -60,10 +94,18 @@ void constrained_rand_gen::run() {
         case iss::access_type::FETCH: {
             mem_rsp resp;
             resp.data.resize(tx.len);
-            vm->start(cpu_instrumentation_if->get_instr_count() + 1, false, iss::finish_cond_e::ICOUNT_LIMIT);
-            auto next_pc = cpu_instrumentation_if->get_next_pc();
-            auto instr = instructions.front();
-            instructions.pop_front();
+            uint32_t instr;
+            auto chkptif = cpu->get_checkpoint_if();
+            iss::checkpoint_if::checkpoint_hndl chck_pt_cpu{0};
+            do {
+                if(chck_pt_cpu)
+                    chkptif->restore(chck_pt_cpu);
+                chck_pt_cpu = chkptif->create();
+                vm->start(0, false, iss::finish_cond_e::SINGLE_FETCH);
+                instr = instructions.front();
+                instructions.pop_front();
+            } while(plugin->pending_traps);
+            chkptif->drop(chck_pt_cpu);
             auto ilen = copy_into(instr, resp.data.data());
             assert(ilen <= tx.len);
             response_fifo.write(resp);
@@ -105,7 +147,8 @@ void constrained_rand_gen::before_end_of_elaboration() {
     }};
     std::tie(cpu, vm, irq_fct) = create_cpu("interp", 0U, *this, csr_reset_vals);
     cpu_instrumentation_if = cpu->get_instrumentation_if();
-
+    plugin= std::make_unique<iss_plugin>();
+    vm->register_plugin(*plugin);
     uvm::uvm_config_db<bool>::get(this, "", "constrained_rand_gen_disass", enable_disass);
     uvm::uvm_config_db<bool>::get(this, "", "heart_beat", heart_beat);
 
@@ -216,3 +259,5 @@ void constrained_rand_gen::gen_trap_handler_mc() {
         data += size;
     }
 }
+
+ }

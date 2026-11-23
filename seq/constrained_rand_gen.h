@@ -15,20 +15,14 @@
 #include <uvm>
 
 namespace seq {
+struct iss_plugin;
 class constrained_rand_gen : public uvm::uvm_component, public seq_if, public iss_if, public irq_push_if {
 public:
     sc_core::sc_export<seq_if> mem_p{"mem_p"};
 
-    constrained_rand_gen(uvm::uvm_component_name name)
-    : uvm::uvm_component(name) {
-        mem_p(*this);
-        gen_startup_code();
-        gen_trap_handler_mc();
-        SC_HAS_PROCESS(constrained_rand_gen);
-        SC_THREAD(run);
-    }
+    constrained_rand_gen(uvm::uvm_component_name name);
 
-    virtual ~constrained_rand_gen() = default;
+    virtual ~constrained_rand_gen();
 
     UVM_COMPONENT_UTILS(constrained_rand_gen);
 
@@ -56,6 +50,7 @@ private:
     cpu_ptr cpu;
     iss::instrumentation_if* cpu_instrumentation_if{nullptr};
     vm_ptr vm;
+    std::unique_ptr<iss_plugin> plugin;
     std::function<uint32_t(unsigned, bool)> irq_fct;
 
     void run();
