@@ -154,9 +154,9 @@ bool instr_gen::is_unsupported(uint32_t x) {
         return true;
 
     Instruction i(x);
-    bool is_csr = ((x & CSRRW_MASK) == CSRRW_ENCODING)|| ((x & CSRRS_MASK) == CSRRS_ENCODING)||((x & CSRRC_MASK) == CSRRC_ENCODING)||
-            ((x & CSRRWI_MASK) == CSRRWI_ENCODING)||((x & CSRRSI_MASK) == CSRRSI_ENCODING)||((x & CSRRCI_MASK) == CSRRCI_ENCODING);
-
+    bool is_csr = ((x & CSRRW_MASK) == CSRRW_ENCODING) || ((x & CSRRS_MASK) == CSRRS_ENCODING) || ((x & CSRRC_MASK) == CSRRC_ENCODING) ||
+                  ((x & CSRRWI_MASK) == CSRRWI_ENCODING) || ((x & CSRRSI_MASK) == CSRRSI_ENCODING) ||
+                  ((x & CSRRCI_MASK) == CSRRCI_ENCODING);
 
     if(is_csr) {
         auto csr = bit_sub<20, 12>(x);
@@ -173,7 +173,7 @@ uint32_t instr_gen::next(uint64_t addr) {
     CHECK(linear_idx_gen.next());
     size_t idx = linear_idx;
     auto& c = constraints.at(linear_instruction_index.at(idx));
-    do{
+    do {
         CHECK(c.next());
     } while(is_unsupported(c.get_instruction()));
     return c.get_instruction();

@@ -46,10 +46,9 @@ inline uint32_t instr_from(size_t len, uint8_t* data) {
     }
     return res;
 }
-}
+} // namespace
 
 namespace seq {
-
 
 struct iss_plugin : public iss::vm_plugin {
 
@@ -59,15 +58,13 @@ struct iss_plugin : public iss::vm_plugin {
     virtual ~iss_plugin() {}
 
     bool registration(const char* const version, iss::vm_if& vm) override {
-        cpu_instrumentation_if =  vm.get_arch()->get_instrumentation_if();
+        cpu_instrumentation_if = vm.get_arch()->get_instrumentation_if();
         return true;
     };
 
-    iss::sync_type get_sync() override {return iss::sync_type::POST_SYNC;};
+    iss::sync_type get_sync() override { return iss::sync_type::POST_SYNC; };
 
-    void callback(iss::instr_info_t) override {
-        pending_traps = cpu_instrumentation_if->get_pending_traps();
-    };
+    void callback(iss::instr_info_t) override { pending_traps = cpu_instrumentation_if->get_pending_traps(); };
 };
 
 constrained_rand_gen::constrained_rand_gen(uvm::uvm_component_name name)
@@ -147,7 +144,7 @@ void constrained_rand_gen::before_end_of_elaboration() {
     }};
     std::tie(cpu, vm, irq_fct) = create_cpu("interp", 0U, *this, csr_reset_vals);
     cpu_instrumentation_if = cpu->get_instrumentation_if();
-    plugin= std::make_unique<iss_plugin>();
+    plugin = std::make_unique<iss_plugin>();
     vm->register_plugin(*plugin);
     uvm::uvm_config_db<bool>::get(this, "", "constrained_rand_gen_disass", enable_disass);
     uvm::uvm_config_db<bool>::get(this, "", "heart_beat", heart_beat);
@@ -260,4 +257,4 @@ void constrained_rand_gen::gen_trap_handler_mc() {
     }
 }
 
- }
+} // namespace seq

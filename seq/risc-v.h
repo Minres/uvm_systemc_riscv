@@ -48,4 +48,4 @@ constexpr unsigned short TIMEH_ADDR = 0xC81;
 constexpr unsigned short INSTRET_ADDR = 0xC02;
 constexpr unsigned short INSTRETH_ADDR = 0xC82;
 
-}
+} // namespace riscv

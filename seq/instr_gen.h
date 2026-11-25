@@ -85,15 +85,13 @@ private:
     uint32_t num_regs{31};
     uint32_t regs_len{32};
     std::unordered_set<short> unsupported_csrs{{// skip mstatus so that MIE is never set
-        riscv::MSTATUS_ADDR, riscv::MIP_ADDR, riscv::USTATUS_ADDR, riscv::UIP_ADDR, riscv::PMPCFG0_ADDR,
-        riscv::PMPCFG1_ADDR, riscv::PMPCFG2_ADDR, riscv::PMPCFG3_ADDR, riscv::DCSR_ADDR}};
-    std::unordered_set<short> volatile_csrs{{riscv::MCYCLE_ADDR, riscv::MCYCLEH_ADDR, riscv::MINSTRET_ADDR,
-        riscv::MINSTRETH_ADDR, riscv::CYCLE_ADDR, riscv::CYCLEH_ADDR, riscv::INSTRET_ADDR,
-        riscv::INSTRETH_ADDR, riscv::TIME_ADDR, riscv::TIMEH_ADDR}};
-    std::vector<std::pair<uint32_t, uint32_t>> disabled_instr {
-        {riscv::WFI_MASK, riscv::WFI_ENCODING}
-    };
-
+                                                riscv::MSTATUS_ADDR, riscv::MIP_ADDR, riscv::USTATUS_ADDR, riscv::UIP_ADDR,
+                                                riscv::PMPCFG0_ADDR, riscv::PMPCFG1_ADDR, riscv::PMPCFG2_ADDR, riscv::PMPCFG3_ADDR,
+                                                riscv::DCSR_ADDR}};
+    std::unordered_set<short> volatile_csrs{{riscv::MCYCLE_ADDR, riscv::MCYCLEH_ADDR, riscv::MINSTRET_ADDR, riscv::MINSTRETH_ADDR,
+                                             riscv::CYCLE_ADDR, riscv::CYCLEH_ADDR, riscv::INSTRET_ADDR, riscv::INSTRETH_ADDR,
+                                             riscv::TIME_ADDR, riscv::TIMEH_ADDR}};
+    std::vector<std::pair<uint32_t, uint32_t>> disabled_instr{{riscv::WFI_MASK, riscv::WFI_ENCODING}};
 };
 
 } // namespace seq

@@ -102,4 +102,4 @@ private:
     csr_constr csrconstr;
 };
 
-} // namespace crig
+} // namespace seq
